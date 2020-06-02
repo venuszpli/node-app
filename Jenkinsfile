@@ -2,33 +2,39 @@ pipeline {
     agent any
     environment{
         DOCKER_TAG = getDockerTag()
-        NEXUS_URL  = "172.31.34.232:8080"
-        IMAGE_URL_WITH_TAG = "${NEXUS_URL}/node-app:${DOCKER_TAG}"
     }
     stages{
-        stage('Build Docker Image'){
+        stage('Checkout Source'){
             steps{
-                sh "docker build . -t ${IMAGE_URL_WITH_TAG}"
+                git "https://github.com/javahometech/node-app.git"
             }
         }
-        stage('Nexus Push'){
+        stage('Build Docker Image'){
             steps{
-                withCredentials([string(credentialsId: 'nexus-pwd', variable: 'nexusPwd')]) {
-                    sh "docker login -u admin -p ${nexusPwd} ${NEXUS_URL}"
-                    sh "docker push ${IMAGE_URL_WITH_TAG}"
+                sh "docker build . -t venuszpli/myweb:${DOCKER_TAG} "
+            }
+        }
+        stage('DockHub Push'){
+            steps{
+                withCredentials([string(credentialsId: 'docker-hub', variable: 'dockerHubPwd')]) {
+                    sh "docker login -u venuszpli -p ${dockerHubPwd}"
+                    sh "docker push venuszpli/myweb:${DOCKER_TAG}"
                 }
             }
         }
-        stage('Docker Deploy Dev'){
+        stage('Docker Deploy k8s'){
             steps{
-                sshagent(['tomcat-dev']) {
-                    withCredentials([string(credentialsId: 'nexus-pwd', variable: 'nexusPwd')]) {
-                        sh "ssh ec2-user@172.31.0.38 docker login -u admin -p ${nexusPwd} ${NEXUS_URL}"
+                sh "chmod" +x changeTag.sh"
+                sh "./changeTag.sh ${DOCKER_TAG}"
+                sshagent(['kops']) {
+                    sh "scp -o StrictHostKeyChecking=no services.yml node-app-pod.yml ec2-user@18.176.232.226:/home/ec2-user/"
+                    script{
+                        try{
+                            sh "ssh ec2-user@18.176.232.226 kubectl apply -f ."
+                        }catch(error){
+                            sh "ssh ec2-user@18.176.232.226 kubectl create -f ."
+                        }
                     }
-					// Remove existing container, if container name does not exists still proceed with the build
-					sh script: "ssh ec2-user@172.31.0.38 docker rm -f nodeapp",  returnStatus: true
-                    
-                    sh "ssh ec2-user@172.31.0.38 docker run -d -p 8080:8080 --name nodeapp ${IMAGE_URL_WITH_TAG}"
                 }
             }
         }
