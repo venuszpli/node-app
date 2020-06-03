@@ -29,9 +29,11 @@ pipeline {
                 sshagent(['kops']) {
                     script{
                         try{
-                            sh "ssh ec2-user@10.121.44.17 kubectl apply -f ."
+                            sh "ssh ec2-user@10.121.44.17 kubectl apply -f https://github.com/javahometech/node-app/blob/master/services.yml"
+                            sh "ssh ec2-user@10.121.44.17 kubectl apply -f https://github.com/javahometech/node-app/blob/master/pods.yml"
                         }catch(error){
-                            sh "ssh ec2-user@10.121.44.17 kubectl create -f ."
+                            sh "ssh ec2-user@10.121.44.17 kubectl create -f https://github.com/javahometech/node-app/blob/master/services.yml"
+                            sh "ssh ec2-user@10.121.44.17 kubectl create -f https://github.com/javahometech/node-app/blob/master/pods.yml"
                         }
                     }
                 }
